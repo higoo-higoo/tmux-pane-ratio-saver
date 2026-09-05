@@ -4,8 +4,7 @@
 #   awk -v mode=validate  -f scale-layout.awk  # one layout on stdin
 #   awk -v mode=signature -f scale-layout.awk  # one layout on stdin
 #   awk -v mode=serialize -f scale-layout.awk  # one layout on stdin
-#
-# The scaler mode is added below with the same parser as its foundation.
+#   awk -v mode=scale     -f scale-layout.awk  # reference and current layouts
 
 BEGIN {
     comma = ","
@@ -38,6 +37,42 @@ END {
             body = serialize(root)
             print checksum(body) "," body
         }
+        exit 0
+    }
+
+    if (mode == "scale") {
+        if (NR != 2) {
+            report("expected reference and current layouts")
+            exit 2
+        }
+
+        reference_root = parse_layout(input[1], 1)
+        if (!reference_root) {
+            report("invalid reference: " parse_error)
+            exit 2
+        }
+        current_root = parse_layout(input[2], 2)
+        if (!current_root) {
+            report("invalid current layout: " parse_error)
+            exit 2
+        }
+        if (topology(reference_root) != topology(current_root)) {
+            report("layout topology differs")
+            exit 3
+        }
+
+        calculate_minimum(reference_root)
+        scaled_width = (target_width == "" ? node_width[current_root] : target_width + 0)
+        scaled_height = (target_height == "" ? node_height[current_root] : target_height + 0)
+        if (scaled_width < 1 || scaled_height < 1 ||
+            !scale_node(reference_root, scaled_width, scaled_height,
+                        node_x[current_root], node_y[current_root])) {
+            report("target is smaller than the layout minimum")
+            exit 4
+        }
+
+        body = serialize(reference_root)
+        print checksum(body) comma body
         exit 0
     }
 
@@ -266,6 +301,168 @@ function serialize(node,    result, i) {
         result = result serialize(node_child[node, i])
     }
     return result (node_kind[node] == "left_right" ? "}" : "]")
+}
+
+function maximum(left, right) {
+    return left > right ? left : right
+}
+
+function calculate_minimum(node,    kind, count, i, child, width, height) {
+    kind = node_kind[node]
+    if (kind == "leaf") {
+        node_min_width[node] = 1
+        node_min_height[node] = 1
+        return
+    }
+
+    count = node_count[node]
+    if (kind == "left_right") {
+        width = count - 1
+        height = 1
+        for (i = 1; i <= count; i++) {
+            child = node_child[node, i]
+            calculate_minimum(child)
+            width += node_min_width[child]
+            height = maximum(height, node_min_height[child])
+        }
+    } else {
+        width = 1
+        height = count - 1
+        for (i = 1; i <= count; i++) {
+            child = node_child[node, i]
+            calculate_minimum(child)
+            width = maximum(width, node_min_width[child])
+            height += node_min_height[child]
+        }
+    }
+    node_min_width[node] = width
+    node_min_height[node] = height
+}
+
+# Allocate total cells across a container's children. A largest-remainder pass
+# is repeated after children that need their structural minimum are fixed.
+function allocate_children(node, total, axis,    count, i, child, minimum, required, active_count, remaining, weight_sum, ideal, floor_sum, extras, best, best_fraction, fixed_any) {
+    count = node_count[node]
+    required = 0
+    active_count = count
+    remaining = total
+
+    for (i = 1; i <= count; i++) {
+        child = node_child[node, i]
+        minimum = (axis == "width" ? node_min_width[child] : node_min_height[child])
+        allocation_min[node, i] = minimum
+        allocation_active[node, i] = 1
+        allocation_value[node, i] = 0
+        required += minimum
+    }
+    if (total < required)
+        return 0
+
+    while (active_count > 0) {
+        weight_sum = 0
+        for (i = 1; i <= count; i++) {
+            if (!allocation_active[node, i])
+                continue
+            child = node_child[node, i]
+            weight_sum += (axis == "width" ? node_width[child] : node_height[child])
+        }
+
+        floor_sum = 0
+        for (i = 1; i <= count; i++) {
+            if (!allocation_active[node, i])
+                continue
+            child = node_child[node, i]
+            ideal = remaining * (axis == "width" ? node_width[child] : node_height[child]) / weight_sum
+            allocation_floor[node, i] = int(ideal)
+            allocation_fraction[node, i] = ideal - int(ideal)
+            allocation_bonus[node, i] = 0
+            floor_sum += int(ideal)
+        }
+
+        extras = remaining - floor_sum
+        while (extras > 0) {
+            best = 0
+            best_fraction = -1
+            for (i = 1; i <= count; i++) {
+                if (!allocation_active[node, i] || allocation_bonus[node, i])
+                    continue
+                if (allocation_fraction[node, i] > best_fraction + 0.000000000001) {
+                    best = i
+                    best_fraction = allocation_fraction[node, i]
+                }
+            }
+            if (!best)
+                return 0
+            allocation_bonus[node, best] = 1
+            extras--
+        }
+
+        fixed_any = 0
+        for (i = 1; i <= count; i++) {
+            if (!allocation_active[node, i])
+                continue
+            allocation_candidate[node, i] = allocation_floor[node, i] + allocation_bonus[node, i]
+            if (allocation_candidate[node, i] < allocation_min[node, i]) {
+                allocation_value[node, i] = allocation_min[node, i]
+                remaining -= allocation_min[node, i]
+                allocation_active[node, i] = 0
+                active_count--
+                fixed_any = 1
+            }
+        }
+
+        if (!fixed_any) {
+            for (i = 1; i <= count; i++) {
+                if (allocation_active[node, i])
+                    allocation_value[node, i] = allocation_candidate[node, i]
+            }
+            return 1
+        }
+        if (active_count == 0)
+            return remaining == 0
+    }
+    return remaining == 0
+}
+
+function scale_node(node, width, height, x, y,    kind, count, available, i, child, child_width, child_height, child_x, child_y) {
+    if (width < node_min_width[node] || height < node_min_height[node])
+        return 0
+
+    node_width[node] = width
+    node_height[node] = height
+    node_x[node] = x
+    node_y[node] = y
+    kind = node_kind[node]
+    if (kind == "leaf")
+        return 1
+
+    count = node_count[node]
+    if (kind == "left_right") {
+        available = width - (count - 1)
+        if (!allocate_children(node, available, "width"))
+            return 0
+        child_x = x
+        for (i = 1; i <= count; i++) {
+            child = node_child[node, i]
+            child_width = allocation_value[node, i]
+            if (!scale_node(child, child_width, height, child_x, y))
+                return 0
+            child_x += child_width + 1
+        }
+    } else {
+        available = height - (count - 1)
+        if (!allocate_children(node, available, "height"))
+            return 0
+        child_y = y
+        for (i = 1; i <= count; i++) {
+            child = node_child[node, i]
+            child_height = allocation_value[node, i]
+            if (!scale_node(child, width, child_height, x, child_y))
+                return 0
+            child_y += child_height + 1
+        }
+    }
+    return 1
 }
 
 function byte_value(character) {
