@@ -1,0 +1,4 @@
+# Valid classic tmux layouts used by unit and integration tests.
+80x24,0,0,0
+120x40,0,0{89x40,0,0,0,30x40,90,0,1}
+120x40,0,0{60x40,0,0,0,59x40,61,0[59x20,61,0,1,59x19,61,21,2]}
