@@ -23,7 +23,11 @@ read_snapshot "$window_id" || exit 0
 load_state "$window_id"
 
 if [ "$event" = "init" ]; then
-    if ! state_is_complete; then
+    if ! state_is_complete ||
+        ! validate_layout "$PRS_REFERENCE" ||
+        ! validate_layout "$PRS_LAST_APPLIED"
+    then
+        clear_state_locked "$window_id"
         capture_snapshot_locked "$window_id" || :
     fi
     exit 0

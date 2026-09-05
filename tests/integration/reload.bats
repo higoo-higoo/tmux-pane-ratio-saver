@@ -32,6 +32,17 @@ teardown() {
   [ "$actual" = "$(scale_for_current_root "$reference" "$actual")" ]
 }
 
+@test "plugin reload replaces an invalid saved state" {
+  current=$(window_layout @0)
+  tmux_test set-option -w -t @0 @pane-ratio-saver-reference-layout '0000,broken'
+  tmux_test set-option -w -t @0 @pane-ratio-saver-last-applied-layout '0000,broken'
+
+  tmux_test run-shell "$ROOT/tmux-pane-ratio-saver.tmux"
+  [ "$(window_option @0 @pane-ratio-saver-reference-layout)" = "$current" ]
+  [ "$(window_option @0 @pane-ratio-saver-last-applied-layout)" = "$current" ]
+  [ "$(window_option @0 @pane-ratio-saver-state-version)" = 1 ]
+}
+
 @test "new and linked windows initialize state once per window id" {
   first_reference=$(window_option @0 @pane-ratio-saver-reference-layout)
   tmux_test new-session -d -s secondary -x 80 -y 24
