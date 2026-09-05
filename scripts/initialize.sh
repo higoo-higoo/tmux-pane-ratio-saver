@@ -33,6 +33,18 @@ hook_index=9871
 "$PRS_TMUX" set-hook -g "window-linked[$hook_index]" \
     "run-shell -b \"$dispatch_command init '#{hook_window}'\""
 
+# Explicit command hooks feed the same state machine. Duplicate notifications
+# are safe because last-applied-layout makes them no-ops.
+for layout_hook in \
+    after-split-window \
+    after-kill-pane \
+    after-resize-pane \
+    after-select-layout
+do
+    "$PRS_TMUX" set-hook -g "${layout_hook}[$hook_index]" \
+        "run-shell -b \"$dispatch_command layout '#{hook_window}'\""
+done
+
 # Window IDs are server-global. De-duplicating them avoids reinitializing a
 # linked window once per session, and init preserves every complete state.
 "$PRS_TMUX" list-windows -a -F '#{window_id}' 2>/dev/null | sort -u |

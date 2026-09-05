@@ -3,8 +3,10 @@
 # Usage:
 #   awk -v mode=validate  -f scale-layout.awk  # one layout on stdin
 #   awk -v mode=signature -f scale-layout.awk  # one layout on stdin
+#   awk -v mode=shape     -f scale-layout.awk  # one layout on stdin
 #   awk -v mode=serialize -f scale-layout.awk  # one layout on stdin
 #   awk -v mode=scale     -f scale-layout.awk  # reference and current layouts
+#   awk -v mode=rebind    -f scale-layout.awk  # preserve geometry, copy pane order
 
 BEGIN {
     comma = ","
@@ -19,7 +21,7 @@ END {
     if (mode == "")
         mode = "validate"
 
-    if (mode == "validate" || mode == "signature" || mode == "serialize") {
+    if (mode == "validate" || mode == "signature" || mode == "shape" || mode == "serialize") {
         if (NR != 1) {
             report("expected exactly one layout")
             exit 2
@@ -33,10 +35,40 @@ END {
 
         if (mode == "signature")
             print topology(root)
+        else if (mode == "shape")
+            print structure(root)
         else if (mode == "serialize") {
             body = serialize(root)
             print checksum(body) "," body
         }
+        exit 0
+    }
+
+    if (mode == "rebind") {
+        if (NR != 2) {
+            report("expected reference and current layouts")
+            exit 2
+        }
+
+        reference_root = parse_layout(input[1], 1)
+        if (!reference_root) {
+            report("invalid reference: " parse_error)
+            exit 2
+        }
+        current_root = parse_layout(input[2], 2)
+        if (!current_root) {
+            report("invalid current layout: " parse_error)
+            exit 2
+        }
+        if (structure(reference_root) != structure(current_root) ||
+            !same_pane_set(reference_root, current_root)) {
+            report("layout structure or pane set differs")
+            exit 3
+        }
+
+        copy_pane_order(reference_root, current_root)
+        body = serialize(reference_root)
+        print checksum(body) comma body
         exit 0
     }
 
@@ -287,6 +319,40 @@ function topology(node,    result, i) {
         result = result topology(node_child[node, i])
     }
     return result ")"
+}
+
+function structure(node,    result, i) {
+    if (node_kind[node] == "leaf")
+        return "LEAF"
+
+    result = (node_kind[node] == "left_right" ? "LR(" : "TB(")
+    for (i = 1; i <= node_count[node]; i++) {
+        if (i > 1)
+            result = result comma
+        result = result structure(node_child[node, i])
+    }
+    return result ")"
+}
+
+function same_pane_set(reference, current,    pane, i) {
+    if (node_kind[reference] == "leaf") {
+        pane = node_pane[reference]
+        return ((2, pane) in seen_pane)
+    }
+    for (i = 1; i <= node_count[reference]; i++) {
+        if (!same_pane_set(node_child[reference, i], current))
+            return 0
+    }
+    return 1
+}
+
+function copy_pane_order(reference, current,    i) {
+    if (node_kind[reference] == "leaf") {
+        node_pane[reference] = node_pane[current]
+        return
+    }
+    for (i = 1; i <= node_count[reference]; i++)
+        copy_pane_order(node_child[reference, i], node_child[current, i])
 }
 
 function serialize(node,    result, i) {

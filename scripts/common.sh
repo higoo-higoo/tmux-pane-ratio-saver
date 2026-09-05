@@ -67,6 +67,7 @@ load_state() {
     PRS_REFERENCE=$(get_window_option "$state_window" "$PRS_REFERENCE_OPTION")
     PRS_LAST_SIZE=$(get_window_option "$state_window" "$PRS_LAST_SIZE_OPTION")
     PRS_LAST_APPLIED=$(get_window_option "$state_window" "$PRS_LAST_APPLIED_OPTION")
+    # shellcheck disable=SC2034  # Consumed by scripts that source this file.
     PRS_PENDING=$(get_window_option "$state_window" "$PRS_PENDING_OPTION")
     PRS_VERSION=$(get_window_option "$state_window" "$PRS_VERSION_OPTION")
 }
@@ -96,6 +97,10 @@ layout_signature() {
 
 scale_layout() {
     printf '%s\n%s\n' "$1" "$2" | awk -v mode=scale -f "$PRS_AWK" 2>/dev/null
+}
+
+rebind_layout() {
+    printf '%s\n%s\n' "$1" "$2" | awk -v mode=rebind -f "$PRS_AWK" 2>/dev/null
 }
 
 clear_state_locked() {
@@ -153,9 +158,18 @@ restore_snapshot_locked() {
     reference_signature=$(layout_signature "$PRS_REFERENCE") || return 1
     current_signature=$(layout_signature "$PRS_LAYOUT") || return 1
     if [ "$reference_signature" != "$current_signature" ]; then
-        debug_log "$restore_window" "pane topology changed; capturing a new reference"
-        capture_snapshot_locked "$restore_window"
-        return $?
+        rebound_reference=$(rebind_layout "$PRS_REFERENCE" "$PRS_LAYOUT")
+        if [ -n "$rebound_reference" ]; then
+            # rotate-window does not emit window-layout-changed in every tmux
+            # release. If the next event is a resize, preserve the old split
+            # geometry while adopting the current ordering of the same panes.
+            PRS_REFERENCE=$rebound_reference
+            set_window_option "$restore_window" "$PRS_REFERENCE_OPTION" "$PRS_REFERENCE" || return 1
+        else
+            debug_log "$restore_window" "pane topology changed; capturing a new reference"
+            capture_snapshot_locked "$restore_window"
+            return $?
+        fi
     fi
 
     target_layout=$(scale_layout "$PRS_REFERENCE" "$PRS_LAYOUT")

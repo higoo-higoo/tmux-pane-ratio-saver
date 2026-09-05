@@ -57,6 +57,12 @@ if [ "$event" = "layout" ]; then
     reference_signature=$(layout_signature "$PRS_REFERENCE") || exit 0
     current_signature=$(layout_signature "$PRS_LAYOUT") || exit 0
     if [ "$reference_signature" != "$current_signature" ]; then
+        # A pane permutation may have happened just before this resize without
+        # its own tmux notification. Let the resize handler rebind pane order
+        # while retaining the pre-resize geometry.
+        if [ "$PRS_SIZE" != "$PRS_LAST_SIZE" ]; then
+            exit 0
+        fi
         capture_snapshot_locked "$window_id" || :
         exit 0
     fi

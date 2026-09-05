@@ -51,4 +51,20 @@ teardown() {
   tmux_test select-layout -t @0 even-horizontal >/dev/null
   wait_until reference_matches_layout @0
   [ "$(window_option @0 @pane-ratio-saver-reference-layout)" = "$(window_layout @0)" ]
+
+  before_rotate=$(window_option @0 @pane-ratio-saver-reference-layout)
+  tmux_test rotate-window -t @0
+  rotated_layout=$(window_layout @0)
+  expected_reference=$(
+    printf '%s\n%s\n' "$before_rotate" "$rotated_layout" |
+      awk -v mode=rebind -f "$ROOT/lib/scale-layout.awk"
+  )
+
+  # tmux versions that do not notify window-layout-changed for rotate-window
+  # are handled on the next resize without losing the old split geometry.
+  tmux_test resize-window -t @0 -x 190 -y 60
+  wait_until state_is_settled @0 190x60
+  [ "$(window_option @0 @pane-ratio-saver-reference-layout)" = "$expected_reference" ]
+  actual=$(window_layout @0)
+  [ "$actual" = "$(scale_for_current_root "$expected_reference" "$actual")" ]
 }

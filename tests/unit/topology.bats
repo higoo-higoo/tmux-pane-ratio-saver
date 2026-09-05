@@ -29,3 +29,23 @@ signature() {
   [ "$lr" != "$swapped" ]
   [ "$lr" != "$other" ]
 }
+
+@test "rebind preserves geometry while adopting a pane permutation" {
+  reference=$(checksum_layout '80x24,0,0{59x24,0,0,0,20x24,60,0,1}')
+  current=$(checksum_layout '120x40,0,0{60x40,0,0,1,59x40,61,0,0}')
+  run sh -c "printf '%s\n%s\n' '$reference' '$current' | awk -v mode=rebind -f '$AWK_SCRIPT'"
+  [ "$status" -eq 0 ]
+  expected=$(checksum_layout '80x24,0,0{59x24,0,0,1,20x24,60,0,0}')
+  [ "$output" = "$expected" ]
+}
+
+@test "rebind rejects a different structure or pane set" {
+  reference=$(checksum_layout '80x24,0,0{40x24,0,0,0,39x24,41,0,1}')
+  current=$(checksum_layout '80x24,0,0[80x12,0,0,0,80x11,0,13,1]')
+  run sh -c "printf '%s\n%s\n' '$reference' '$current' | awk -v mode=rebind -f '$AWK_SCRIPT'"
+  [ "$status" -eq 3 ]
+
+  current=$(checksum_layout '80x24,0,0{40x24,0,0,0,39x24,41,0,2}')
+  run sh -c "printf '%s\n%s\n' '$reference' '$current' | awk -v mode=rebind -f '$AWK_SCRIPT'"
+  [ "$status" -eq 3 ]
+}
