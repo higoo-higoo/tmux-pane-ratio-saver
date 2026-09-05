@@ -1,0 +1,38 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes bats shellcheck tmux
+
+      - name: Show tmux version
+        run: tmux -V
+
+      - name: Check shell scripts
+        run: shellcheck -x -P scripts tmux-pane-ratio-saver.tmux scripts/*.sh lib/checksum.sh
+
+      - name: Run unit tests
+        run: bats tests/unit
+
+      - name: Run integration tests
+        run: bats tests/integration
