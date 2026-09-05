@@ -19,6 +19,9 @@ validate_body() {
 @test "accepts left-right, top-bottom, and nested trees" {
   run validate_body '120x40,0,0{60x40,0,0,0,59x40,61,0[59x20,61,0,1,59x19,61,21,2]}'
   [ "$status" -eq 0 ]
+
+  run validate_body '80x24,0,0{40x24,0,0[40x12,0,0,0,40x11,0,13,1],39x24,41,0[39x12,41,0,2,39x11,41,13,3]}'
+  [ "$status" -eq 0 ]
 }
 
 @test "rejects a bad checksum" {
