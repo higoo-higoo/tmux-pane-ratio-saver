@@ -58,6 +58,7 @@ read_snapshot() {
     case $PRS_WIDTH in ''|*[!0-9]*) return 1 ;; esac
     case $PRS_HEIGHT in ''|*[!0-9]*) return 1 ;; esac
     case $PRS_ZOOMED in 0|1) ;; *) return 1 ;; esac
+    [ "$PRS_WIDTH" -gt 0 ] && [ "$PRS_HEIGHT" -gt 0 ] || return 1
     [ -n "$PRS_LAYOUT" ]
 }
 
@@ -77,7 +78,11 @@ state_is_complete() {
         [ -n "$PRS_LAST_APPLIED" ] &&
         case $PRS_LAST_SIZE in
             *[!0-9x]*|x*|*x|*x*x*) false ;;
-            *) true ;;
+            *)
+                state_width=${PRS_LAST_SIZE%%x*}
+                state_height=${PRS_LAST_SIZE#*x}
+                [ "$state_width" -gt 0 ] && [ "$state_height" -gt 0 ]
+                ;;
         esac
 }
 
