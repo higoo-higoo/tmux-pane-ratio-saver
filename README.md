@@ -4,6 +4,8 @@
 window changes size. It supports horizontal, vertical, and arbitrarily nested
 classic tiled layouts.
 
+![demo](./media/demo.gif)
+
 The plugin always scales from the last user-defined reference layout. It does
 not feed a rounded result into the next resize, so repeatedly growing and
 shrinking a window does not accumulate drift. Manual pane operations such as
