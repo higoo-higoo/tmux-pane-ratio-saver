@@ -55,28 +55,6 @@ set -w @pane-ratio-saver-enabled off
 Debug mode reports invalid layouts and failed applications. Normal operation
 does not display a message for each hook.
 
-## Commands
-
-Capture the current pane arrangement as the new reference:
-
-```sh
-/path/to/tmux-pane-ratio-saver/scripts/capture-reference.sh '#{window_id}'
-```
-
-For example, bind it to `prefix` + <kbd>R</kbd>:
-
-```tmux
-bind-key R run-shell '/path/to/tmux-pane-ratio-saver/scripts/capture-reference.sh #{window_id}'
-```
-
-Clear all plugin state for the current window:
-
-```sh
-/path/to/tmux-pane-ratio-saver/scripts/clear-state.sh '#{window_id}'
-```
-
-The next relevant hook captures a fresh reference after state is cleared.
-
 ## Behavior and limitations
 
 State is stored in window-scoped tmux user options. Linked windows therefore
