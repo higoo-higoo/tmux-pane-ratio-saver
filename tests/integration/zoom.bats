@@ -4,7 +4,7 @@ setup() {
   load ../helpers.bash
   ROOT=$(project_root)
   start_tmux 120 40
-  tmux_test split-window -h -p 25
+  tmux_test split-window -h -l 25%
   load_plugin
 }
 

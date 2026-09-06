@@ -12,7 +12,7 @@ shrinking a window does not accumulate drift. Manual pane operations such as
 
 ## Requirements
 
-- tmux
+- tmux 3.3 or later
 - a POSIX shell and POSIX awk
 - standard `od`, `sed`, `tr`, and `sort` utilities
 

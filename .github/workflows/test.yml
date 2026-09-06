@@ -9,12 +9,17 @@ permissions:
 
 jobs:
   test:
+    name: tmux ${{ matrix.tmux-version }} / ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-22.04
-          - ubuntu-24.04
+        include:
+          - os: ubuntu-22.04
+            tmux-version: "3.3"
+          - os: ubuntu-24.04
+            tmux-version: "3.4"
+          - os: ubuntu-24.04
+            tmux-version: "3.7c"
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -23,10 +28,31 @@ jobs:
       - name: Install test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes bats shellcheck tmux
+          sudo apt-get install --yes \
+            bats \
+            bison \
+            build-essential \
+            libevent-dev \
+            libncurses-dev \
+            shellcheck
+
+      - name: Install tmux ${{ matrix.tmux-version }}
+        env:
+          TMUX_VERSION: ${{ matrix.tmux-version }}
+        run: |
+          curl --fail --location --silent --show-error \
+            "https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz" \
+            --output "/tmp/tmux-${TMUX_VERSION}.tar.gz"
+          tar --extract --gzip --file "/tmp/tmux-${TMUX_VERSION}.tar.gz" --directory /tmp
+          cd "/tmp/tmux-${TMUX_VERSION}"
+          ./configure
+          make --jobs="$(nproc)"
+          sudo make install
 
       - name: Show tmux version
-        run: tmux -V
+        env:
+          TMUX_VERSION: ${{ matrix.tmux-version }}
+        run: test "$(tmux -V)" = "tmux ${TMUX_VERSION}"
 
       - name: Check shell scripts
         run: shellcheck -x -P scripts tmux-pane-ratio-saver.tmux scripts/*.sh lib/checksum.sh
