@@ -18,8 +18,6 @@ shrinking a window does not accumulate drift. Manual pane operations such as
 - a POSIX shell and POSIX awk
 - standard `od`, `sed`, `tr`, and `sort` utilities
 
-There are no runtime dependencies on jq, Python, Ruby, or Perl.
-
 ## Installation
 
 With [TPM](https://github.com/tmux-plugins/tpm), add the plugin to `.tmux.conf`:
@@ -48,7 +46,7 @@ set -g @pane-ratio-saver-enabled on
 set -g @pane-ratio-saver-debug off
 ```
 
-Either option may be overridden for one window:
+Each option may be overridden for one window:
 
 ```tmux
 set -w @pane-ratio-saver-enabled off
@@ -112,5 +110,3 @@ shellcheck -x -P scripts tmux-pane-ratio-saver.tmux scripts/*.sh lib/checksum.sh
 
 The integration suite starts each test with a dedicated `tmux -L` socket and
 includes more than 100 successive resizes to verify that ratios do not drift.
-See [implementation.md](implementation.md) for the full format, scaling, and
-state-machine design.
